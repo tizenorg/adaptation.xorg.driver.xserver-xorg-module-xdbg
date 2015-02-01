@@ -1,6 +1,6 @@
 Name: xorg-x11-module-xdbg
 Summary: Xserver debug module
-Version: 0.1.33
+Version: 0.1.46
 Release:    1
 VCS:        adaptation/xorg/driver/xserver-xorg-module-xdbg#xorg-x11-module-xdbg-0.1.13-1-79-gfb1d23b62faa7f302ac1b19ff1d3f757c4745b13
 Group:      System/Libraries
@@ -76,6 +76,7 @@ cp -af COPYING %{buildroot}/usr/share/license/%{name}
 %remove_docs
 
 %files
+%manifest xorg-x11-module-xdbg.manifest
 %defattr(-,root,root,-)
 /usr/share/license/%{name}
 %{_bindir}/xdbg

@@ -29,6 +29,8 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 **************************************************************************/
 
+#include <config.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
@@ -241,7 +243,7 @@ xDbgEvlogRuleSet (const int argc, const char **argv, char *reply, int *len)
         if (!xDbgEvlogReadRuleFile(argv[1], reply, len))
             return FALSE;
         rulechecker_print_rule (rc, reply, len);
-        
+
         return TRUE;
     }
     else if (!_strcasecmp (command, "print"))
@@ -337,12 +339,13 @@ xDbgEvlogReadRuleFile(const char *filename, char *reply, int *len)
 
         pfs += (strlen(new_argv[2]) + 1);
 
-
         if(!xDbgEvlogRuleSet ((const int) new_argc, (const char**) new_argv, reply, len))
         {
+            if (fd >= 0)
+                close (fd);
+
             return FALSE;
         }
-
     }
 
     if (fd >= 0)
@@ -350,7 +353,6 @@ xDbgEvlogReadRuleFile(const char *filename, char *reply, int *len)
 
     return TRUE;
 }
-
 
 ExtensionInfo Evlog_extensions[] = {
     {xDbgEvlogCompositeGetBase, 0, 0, 0, NULL, NULL},
@@ -365,8 +367,12 @@ ExtensionInfo Evlog_extensions[] = {
     {xDbgEvlogXextXtestGetBase, 0, 0, 0, NULL, NULL},
     {xDbgEvlogXextXtestExt1GetBase, 0, 0, 0, NULL, NULL},
     {xDbgEvlogXextShapeGetBase, 0, 0, 0, NULL, NULL},
-    {xDbgEvlogXvGetBase, 0, 0, 0, NULL, NULL}
+    {xDbgEvlogXvGetBase, 0, 0, 0, NULL, NULL},
+#if HAVE_HWC
+    {xDbgEvlogHwcGetBase, 0, 0, 0, NULL, NULL},
+#endif
 };
+
 ExtensionInfo* Sorted_Evlog_extensions;
 int Extensions_size = 0;
 
@@ -455,7 +461,7 @@ xDbgEvlogFillLog (EvlogInfo *evinfo, int detail_level, char *reply, int *len)
     else
         REPLY ("[%10.3f][%5ld] %22s(%2d:%5d) %s %7s ",
                     evinfo->time / 1000.0,
-                    evinfo->time - prev,
+                    (long int)evinfo->time - prev,
                     xDbgEvlogGetCmd (evinfo->client.command),
                     evinfo->client.index,
                     evinfo->client.pid,
@@ -483,9 +489,9 @@ xDbgEvlogFillLog (EvlogInfo *evinfo, int detail_level, char *reply, int *len)
     }
     else if (evinfo->type == ERROR)
     {
-        REPLY("(ErrorCode(0x%02x) resourceID(0x%lx) majorCode(%d) minorCode(%d))",
+        REPLY("(ErrorCode(0x%02x) resourceID(0x%x) majorCode(%d) minorCode(%d))",
             evinfo->err.errorCode,
-            evinfo->err.resourceID,
+            (unsigned int)evinfo->err.resourceID,
             evinfo->err.majorCode,
             evinfo->err.minorCode);
     }
@@ -563,7 +569,7 @@ char* xDbgGetAtom(Atom atom, EvlogInfo *evinfo, char *reply, int *len)
     if (NameForAtom(atom))
         snprintf (table->buf, XDBG_BUF_SIZE, "%s", (char*)NameForAtom(atom));
     else
-        snprintf (table->buf, XDBG_BUF_SIZE, "0x%lx", atom);
+        snprintf (table->buf, XDBG_BUF_SIZE, "0x%x", (unsigned int)atom);
 
     xorg_list_add(&table->link, &evinfo->evatom.list);
     evinfo->evatom.size++;
@@ -607,7 +613,7 @@ char* xDbgGetRegion(XserverRegion region, EvlogInfo *evinfo, char *reply, int *l
 
         table->xid = region;
 
-        snprintf (table->buf, XDBG_BUF_SIZE, "0x%lx", region);
+        snprintf (table->buf, XDBG_BUF_SIZE, "0x%x", (unsigned int)region);
         xorg_list_add(&table->link, &evinfo->evregion.list);
         evinfo->evregion.size++;
     }

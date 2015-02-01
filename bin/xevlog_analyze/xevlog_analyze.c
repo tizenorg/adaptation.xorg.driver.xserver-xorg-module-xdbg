@@ -160,6 +160,7 @@ static void _xEvlogAnalyzePrint (EvlogOption *eo, char* reply, int* len)
 
             read_len = read (fd, &Extensions_size, sizeof (int));
             GOTO_IF_FAIL (read_len == sizeof (int), print_done);
+            GOTO_IF_FAIL (Extensions_size > 0, print_done);
             total += read_len;
 
             for (i = 0 ; i < Extensions_size ; i++)

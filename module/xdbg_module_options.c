@@ -63,7 +63,8 @@ void
 xDbgModuleParseOptions (XDbgModule *pMod, XF86OptionPtr pOpt)
 {
     OptionInfoPtr options = xnfalloc (sizeof (module_options));
-    char *log_path, *evlog_path, *evlog_rule_path;
+    const char *path;
+    char temp[256];
     int log_level = XLOG_LEVEL_DEFAULT;
 
     memcpy (options, module_options, sizeof(module_options));
@@ -76,8 +77,13 @@ xDbgModuleParseOptions (XDbgModule *pMod, XF86OptionPtr pOpt)
     xDbgLogEnableDlog (pMod->dlog);
 
     /* log_path */
-    log_path = xf86GetOptValString (options, OPTION_LOG_PATH);
-    XDBG_INFO (MXDBG, "log path: \"%s\"\n", (log_path)?log_path:"none");
+    path = xf86GetOptValString (options, OPTION_LOG_PATH);
+    XDBG_INFO (MXDBG, "log path: \"%s\"\n", (path)?path:"none");
+    if (path)
+    {
+        snprintf (temp, sizeof(temp), "%s", path);
+        xDbgModuleCommandInitLogPath (pMod, temp);
+    }
 
     /* log_level */
     xf86GetOptValInteger (options, OPTION_LOG_LEVEL, &log_level);
@@ -85,16 +91,22 @@ xDbgModuleParseOptions (XDbgModule *pMod, XF86OptionPtr pOpt)
     xDbgLogSetLevel (XDBG_ALL_MODULE, log_level);
 
     /* evlog_path */
-    evlog_path = xf86GetOptValString (options, OPTION_EVLOG_PATH);
-    XDBG_INFO (MXDBG, "evlog path: \"%s\"\n", (evlog_path)?evlog_path:"none");
+    path = xf86GetOptValString (options, OPTION_EVLOG_PATH);
+    XDBG_INFO (MXDBG, "evlog path: \"%s\"\n", (path)?path:"none");
+    if (path)
+    {
+        snprintf (temp, sizeof(temp), "%s", path);
+        xDbgModuleEvlogSetEvlogPath (pMod, -1, temp, NULL, NULL);
+    }
 
     /* evlog_rule_path */
-    evlog_rule_path = xf86GetOptValString (options, OPTION_EVLOG_RULE_PATH);
-    XDBG_INFO (MXDBG, "evlog rule path: \"%s\"\n", (evlog_rule_path)?evlog_rule_path:"none");
-
-    xDbgModuleCommandInitLogPath (pMod, log_path);
-    xDbgModuleEvlogSetEvlogPath (pMod, -1, evlog_path, NULL, NULL);
-    xDbgModuleCommandInitEvlogRulePath (pMod, evlog_rule_path);
+    path = xf86GetOptValString (options, OPTION_EVLOG_RULE_PATH);
+    XDBG_INFO (MXDBG, "evlog rule path: \"%s\"\n", (path)?path:"none");
+    if (path)
+    {
+        snprintf (temp, sizeof(temp), "%s", path);
+        xDbgModuleCommandInitEvlogRulePath (pMod, temp);
+    }
 
     free (options);
 }

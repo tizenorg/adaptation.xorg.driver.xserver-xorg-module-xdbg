@@ -55,6 +55,19 @@ AC_ARG_ENABLE(secure-log,
 # Checks for pkg-config packages
 PKG_CHECK_MODULES(XDBG, dlog xorg-server x11 xdamage xext dbus-1 bigreqsproto compositeproto damageproto dri2proto fixesproto fontsproto gestureproto inputproto kbproto randrproto recordproto renderproto resourceproto videoproto xcmiscproto xextproto xf86vidmodeproto xproto libdrm xcomposite libdri2 xgesture xtst xrandr xi xv)
 
+PKG_CHECK_MODULES(HWC, libhwc hwcproto,
+	[SAVE_CPPFLAGS="$CPPFLAGS"
+	CPPFLAGS="$CPPFLAGS $HWC_CFLAGS"
+	AC_CHECK_HEADERS([X11/extensions/hwc.h],[have_hwc_h="yes"],[have_hwc_h="no"])
+	CPPFLAGS="$SAVE_CPPFLAGS"],[echo "not found"])
+
+AM_CONDITIONAL(HAVE_HWC, [test "x$have_hwc_h" = xyes])
+if test "x$have_hwc_h" = xyes; then
+    AC_DEFINE(HAVE_HWC, 1, [Have libhwc])
+    XDBG_CFLAGS="$XDBG_CFLAGS $HWC_CFLAGS"
+    XDBG_LIBS="$XDBG_LIBS $HWC_LIBS"
+fi
+
 AC_SUBST([XDBG_CFLAGS])
 AC_SUBST([XDBG_LIBS])
 
