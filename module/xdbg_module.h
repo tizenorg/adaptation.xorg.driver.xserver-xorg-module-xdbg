@@ -46,6 +46,22 @@ typedef struct _ModuleClientInfo
     char   command[PATH_MAX+1];
 } ModuleClientInfo;
 
+typedef struct _XDbgModuleTraceClientOption
+{
+    char   name[PATH_MAX+1];
+    char   action[PATH_MAX+1];
+    char   cmd[PATH_MAX+1];
+} ModuleTraceClientOption;
+
+typedef struct _XDbgModuleTraceClient
+{
+    struct xorg_list link;
+
+    int    pid;
+    char   name[PATH_MAX+1];
+    int    conn_cnt;
+} ModuleTraceClient;
+
 typedef struct _XDbgModule
 {
     Bool  dlog;
@@ -53,6 +69,11 @@ typedef struct _XDbgModule
     char *evlog_path;
     char *evlog_rule_path;
     char *cwd;
+    char *xerror_log_path;
+    int  trace_cnt;
+
+    ModuleTraceClientOption *trace_options;
+    struct xorg_list trace_list; /* trace client list */
 } XDbgModule;
 
 extern DevPrivateKeyRec debug_client_key;

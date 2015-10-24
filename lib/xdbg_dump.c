@@ -187,6 +187,7 @@ _xDbgDumpSetOptions (void)
         char temp[64];
         char *c;
         int nums[4];
+        char *tokp;
 
         if (xdbg_dump_info.crop)
         {
@@ -196,12 +197,12 @@ _xDbgDumpSetOptions (void)
 
         snprintf (temp, sizeof (temp), "%s", xdbg_dump_info.crop_str);
 
-        c = strtok (temp, ",");
+        c = strtok_r (temp, ",", &tokp);
         i = 0;
         while (c != NULL)
         {
             nums[i++] = atoi(c);
-            c = strtok (NULL, ",");
+            c = strtok_r (NULL, ",", &tokp);
             if (i == 4)
                 break;
         }

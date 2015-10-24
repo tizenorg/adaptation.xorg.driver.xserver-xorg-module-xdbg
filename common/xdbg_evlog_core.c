@@ -58,6 +58,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "xdbg_evlog_core.h"
 #include "xdbg_evlog.h"
 
+#define FP1616toDBL(x) ((x) * 1.0 / (1 << 16))
 
 static char*
 _getWindowAttributeMask (CARD32 mask, char *reply, int *len)
@@ -130,7 +131,7 @@ _getConfigureWindowMask (CARD16 mask, char *reply, int *len, XID *vlist)
     if(vlist)
     {
         pVlist = vlist;
-        
+
         if ((mask & (CWX | CWY)) && (!(mask & (CWHeight | CWWidth)))) {
             GET_INT16(CWX, x);
             GET_INT16(CWY, y);
@@ -143,7 +144,7 @@ _getConfigureWindowMask (CARD16 mask, char *reply, int *len, XID *vlist)
             GET_CARD16(CWHeight, h);
         }
     }
-    
+
     for (i = 0 ; i < sizeof(mask) * 4 ; i++)
     {
         if(mask & (1 << i))
@@ -338,7 +339,7 @@ char * xDbgEvlogRequestCore (EvlogInfo *evinfo, int detail_level, char *reply, i
                REPLY ("(");
                 reply = _getWindowAttributeMask(stuff->valueMask, reply, len);
                 if (stuff->valueMask == CWEventMask)
-        
+
            REPLY (", mask(%x)", (unsigned int)*((XID *)&stuff[1]));
                REPLY (")");
             }
@@ -426,7 +427,21 @@ char * xDbgEvlogRequestCore (EvlogInfo *evinfo, int detail_level, char *reply, i
 
             return reply;
         }
+    case X_InternAtom:
+        {
+            xInternAtomReq *stuff = (xInternAtomReq *)req;
+            char temp[64] = {0, };
 
+            int min = MIN (sizeof (temp) -1, stuff->nbytes);
+            strncpy (temp, (char*)&stuff[1], min);
+            temp[min] = '\0';
+
+            REPLY (": Atom(%s) onlyIfExists(%s)",
+                temp,
+                stuff->onlyIfExists?"True":"False");
+
+            return reply;
+        }
     case X_ChangeProperty:
         {
             xChangePropertyReq *stuff = (xChangePropertyReq *)req;
@@ -1745,10 +1760,205 @@ char * xDbgEvlogEventCore (EvlogInfo *evinfo, int detail_level, char *reply, int
             return reply;
 		}
 
-    case MappingNotify:
     case GenericEvent:
+        {
+            int xinput_event = 0;
+            xGenericEvent *ge = (xGenericEvent *)evt;
+            switch (ge->evtype)
+            {
+                case PresentConfigureNotify:
+                {
+                    xPresentConfigureNotify *stuff = (xPresentConfigureNotify *) evt;
+
+                    REPLY (":PresentConfigureNotify window(0x%x)(%ux%u+%d+%d) off x,y (%d,%d)  pximap width(%u) height(%u) flags(0x%x)",
+                        (unsigned int)stuff->window,
+                        (unsigned int)stuff->width,
+                        (unsigned int)stuff->height,
+                        (int)stuff->x,
+                        (int)stuff->y,
+                        (int)stuff->off_x,
+                        (int)stuff->off_y,
+                        (unsigned int)stuff->pixmap_width,
+                        (unsigned int)stuff->pixmap_height,
+                        (unsigned int)stuff->pixmap_flags);
+
+                    evinfo->evt.size = sizeof (xPresentConfigureNotify);
+
+                    return reply;
+                }
+
+                case PresentCompleteNotify:
+                {
+                    xPresentCompleteNotify *stuff = (xPresentCompleteNotify *) evt;
+                    REPLY (":PresentCompleteNotify window(0x%x) serial(0x%x) kind(%u) mode(%u) ust(%lu)",
+                        (unsigned int)stuff->window,
+                        (unsigned int)stuff->serial,
+                        (unsigned int)stuff->kind,
+                        (unsigned int)stuff->mode,
+                        (unsigned long)stuff->ust);
+
+                    evinfo->evt.size = sizeof (xPresentCompleteNotify);
+
+                    return reply;
+                }
+
+                case PresentIdleNotify:
+                {
+                    xPresentIdleNotify *stuff = (xPresentIdleNotify *) evt;
+                    REPLY (":PresentIdleNotify window(0x%x) serial(0x%x) pixmap(0x%x) idle_fence(0x%x)",
+                        (unsigned int)stuff->window,
+                        (unsigned int)stuff->serial,
+                        (unsigned int)stuff->pixmap,
+                        (unsigned int)stuff->idle_fence);
+
+                    evinfo->evt.size = sizeof (xPresentIdleNotify);
+
+                    return reply;
+                }
+
+                case PresentRedirectNotify:
+                {
+                    xPresentRedirectNotify *stuff = (xPresentRedirectNotify *)evt;
+
+                    REPLY (":PresentRedirectNotify window(0x%x) pixmap(0x%x)",
+                        (unsigned int)stuff->window,
+                        (unsigned int)stuff->pixmap);
+
+#if 0
+                    REPLY (": window(0x%x) pixmap(0x%x) (s,v,u)(%u,0x%x,0x%x) x,y(%d,%d) crtc(%u) wait(0x%x) idle(0x%x) op(0x%x) (t,d,r)(%u,%u,%u)",
+
+                        (unsigned int)stuff->serial,
+                        (unsigned int)stuff->valid,
+                        (unsigned int)stuff->update,
+                        (int)stuff->x_off,
+                        (int)stuff->y_off,
+                        (unsigned int)stuff->target_crtc,
+                        (unsigned int)stuff->wait_fence,
+                        (unsigned int)stuff->idle_fence,
+                        (unsigned int)stuff->options,
+                        (unsigned int)stuff->target_msc,
+                        (unsigned int)stuff->divisor,
+                        (unsigned int)stuff->remainder);
+#endif
+                    evinfo->evt.size = sizeof (xPresentRedirectNotify);
+
+                    return reply;
+                }
+
+                /* XI generic evnet */
+                case XI_ButtonPress:
+                {
+                    REPLY (":XI_ButtonPress");
+                    xinput_event = 1;
+                    break;
+                }
+                case XI_ButtonRelease:
+                {
+                    REPLY (":XI_ButtonRelease");
+                    xinput_event = 1;
+                    break;
+                }
+                case XI_Motion:
+                {
+                    REPLY (":XI_Motion");
+                    xinput_event = 1;
+                    break;
+                }
+                case XI_TouchBegin:
+                {
+                    REPLY (":XI_TouchBegin");
+                    xinput_event = 1;
+                    break;
+                }
+                case XI_TouchEnd:
+                {
+                    REPLY (":XI_TouchEnd");
+                    xinput_event = 1;
+                    break;
+                }
+                case XI_TouchUpdate:
+                {
+                    REPLY (":XI_TouchUpdate");
+                    xinput_event = 1;
+                    break;
+                }
+                case XI_TouchOwnership:
+                {
+                    REPLY (":XI_TouchOwnership");
+                    xinput_event = 1;
+                    break;
+                }
+                case XI_TouchCancel:
+                {
+                    REPLY (":XI_TouchCancel");
+                    xinput_event = 1;
+                    break;
+                }
+                case XI_RawButtonPress:
+                {
+                    REPLY (":XI_RawButtonPress");
+                    xinput_event = 1;
+                    break;
+                }
+                case XI_RawButtonRelease:
+                {
+                    REPLY (":XI_RawButtonRelease");
+                    xinput_event = 1;
+                    break;
+                }
+                case XI_RawMotion:
+                {
+                    REPLY (":XI_RawMotion");
+                    xinput_event = 1;
+                    break;
+                }
+                case XI_RawTouchBegin:
+                {
+                    REPLY (":XI_RawTouchBegin");
+                    xinput_event = 1;
+                    break;
+                }
+                case XI_RawTouchEnd:
+                {
+                    REPLY (":XI_RawTouchEnd");
+                    xinput_event = 1;
+                    break;
+                }
+                case XI_RawTouchUpdate:
+                {
+                    REPLY (":XI_RawTouchUpdate");
+                    xinput_event = 1;
+                    break;
+                }
+
+                default:
+                {
+                    break;
+                }
+
+            }
+
+            if (xinput_event == 1)
+            {
+                xXIDeviceEvent *stuff = (xXIDeviceEvent *) evt;
+                REPLY (" device(%d), event win(0x%x), child(0x%x), root(%.f,%.f), win(%.f, %.f)\n",
+                    stuff->deviceid,
+                    stuff->event,
+                    stuff->child,
+                    FP1616toDBL(stuff->root_x),
+                    FP1616toDBL(stuff->root_y),
+                    FP1616toDBL(stuff->event_x),
+                    FP1616toDBL(stuff->event_y));
+
+                evinfo->evt.size = sizeof (xXIDeviceEvent);
+
+                return reply;
+            }
+        }
+    case MappingNotify:
     default:
             break;
+
     }
 
     return reply;
@@ -1807,6 +2017,23 @@ char * xDbgEvlogReplyCore (EvlogInfo *evinfo, int detail_level, char *reply, int
                         REPLY (", ");
                 }
                 REPLY (")");
+            }
+
+            return reply;
+        }
+
+    case X_InternAtom:
+        {
+            if (evinfo->rep.isStart)
+            {
+                xInternAtomReply *stuff = (xInternAtomReply *)rep;
+
+                REPLY (": Atom(0x%x)",
+                    (unsigned int)stuff->atom);
+            }
+            else
+            {
+                return reply;
             }
 
             return reply;

@@ -48,6 +48,8 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "xdbg_evlog_randr.h"
 #include "xdbg_evlog_xinput.h"
 #include "xdbg_evlog_xv.h"
+#include "xdbg_evlog_dri3.h"
+#include "xdbg_evlog_present.h"
 #if HAVE_HWC
 #include "xdbg_evlog_hwc.h"
 #endif

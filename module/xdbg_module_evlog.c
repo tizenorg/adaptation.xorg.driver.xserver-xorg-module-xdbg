@@ -67,6 +67,8 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define XREGISTRY
 #include "registry.h"
 
+#include <dlog.h>
+
 #define FP1616toDBL(x) ((x) * 1.0 / (1 << 16))
 
 Bool	    xev_trace_on = FALSE;
@@ -75,6 +77,30 @@ static int  xev_trace_fd = -1;
 static int  xev_trace_record_fd = -1;
 static Atom atom_client_pid = None;
 static int  init = 0;
+static char *xerror_path = NULL;
+
+void
+xDbgModuleEvlogXErrorSetPath (char *path)
+{
+    xerror_path = path;
+}
+
+static void xErrorPrint (EvlogInfo *evinfo, const char *f, ...)
+{
+    va_list args;
+
+    va_start (args, f);
+    if (!strcmp (xerror_path, "dlog"))
+    {
+        const char * error_tag = "XERROR";
+        SLOG_VA (LOG_DEBUG, error_tag, f, args);
+    }
+    else if (!strcmp (xerror_path, "xorg"))
+    {
+        LogVWrite (1, f, args);
+    }
+    va_end (args);
+}
 
 static void evtRecord (int fd, EvlogInfo *evinfo)
 {
@@ -346,7 +372,7 @@ static void evtPrint (EvlogType type, ClientPtr client, xEvent *ev, ReplyInfoRec
                           LookupRequestName (stuff->reqType, stuff->data));
         }
 
-        if (type == ERROR)
+        if (type == ERROR || type == XERROR)
         {
             xError* err = NULL;
 
@@ -362,6 +388,10 @@ static void evtPrint (EvlogType type, ClientPtr client, xEvent *ev, ReplyInfoRec
                 evinfo.err.resourceID = err->resourceID;
                 evinfo.err.minorCode = err->minorCode;
                 evinfo.err.majorCode = err->majorCode;
+                snprintf (evinfo.err.errorName, sizeof (evinfo.err.errorName), "%s",
+                            LookupErrorName(err->errorCode));
+                snprintf (evinfo.err.majorName, sizeof (evinfo.err.majorName), "%s",
+                            LookupMajorName(err->majorCode));
             }
             else
                 XDBG_NEVER_GET_HERE (MXDBG);
@@ -384,7 +414,7 @@ static void evtPrint (EvlogType type, ClientPtr client, xEvent *ev, ReplyInfoRec
     evinfo.time = GetTimeInMillis ();
 
     /* get extension entry */
-    if (!EntryInit && !xDbgEvlogGetExtensionEntry (NULL))
+    if (!EntryInit && !xDbgEvlogGetExtensionEntry ())
         return;
 
     EntryInit = 1;
@@ -392,7 +422,15 @@ static void evtPrint (EvlogType type, ClientPtr client, xEvent *ev, ReplyInfoRec
     if (!xDbgEvlogRuleValidate (&evinfo))
         return;
 
-    if (xev_trace_record_fd >= 0)
+    if (type == XERROR)
+    {
+        char log[1024];
+        int size = sizeof (log);
+
+        if (xDbgEvlogFillLog (&evinfo, xev_trace_detail_level, log, &size))
+            xErrorPrint (&evinfo, "%s", log);
+    }
+    else if (xev_trace_record_fd >= 0)
     {
         if (xDbgEvlogFillLog (&evinfo, EVLOG_PRINT_REPLY_DETAIL, NULL, NULL))
             evtRecord (xev_trace_record_fd, &evinfo);
@@ -411,7 +449,7 @@ static void evtPrint (EvlogType type, ClientPtr client, xEvent *ev, ReplyInfoRec
     xDbgDistroyRegionList(&evinfo);
 }
 
-#if TIZEN_ENGINEER_MODE
+#if (TIZEN_ENGINEER_MODE || USE_NORMAL_LOG)
 static const char*
 _traceGetWindowName (ClientPtr client, Window window)
 {
@@ -477,7 +515,7 @@ _traceEvent (CallbackListPtr *pcbl, pointer nulldata, pointer calldata)
     static int xi2_opcode = -1;
     xEvent *pev;
 
-#if TIZEN_ENGINEER_MODE
+#if (TIZEN_ENGINEER_MODE || USE_NORMAL_LOG)
     static char* ename[]=
     {
         "KeyPress",
@@ -550,10 +588,14 @@ _traceEvent (CallbackListPtr *pcbl, pointer nulldata, pointer calldata)
             }
         }
 
+        if (type == X_Error && xerror_path)
+            evtPrint (XERROR, pClient, pev, NULL);
+
         if (type != X_Error && xev_trace_on)
             evtPrint (EVENT, pClient, pev, NULL);
         else if (type == X_Error && xev_trace_on)
             evtPrint (ERROR, pClient, pev, NULL);
+
     }
 }
 
@@ -716,7 +758,13 @@ xDbgModuleEvlogPrintEvents (XDbgModule *pMod, Bool on, const char * client_name,
                 snprintf (fd_name, 256, "/proc/%d/fd/1", info->pid);
                 xev_trace_fd = open (fd_name, O_RDWR);
                 if (xev_trace_fd < 0)
-                    XDBG_REPLY ("failed: open consol '%s'. (%s)\n", fd_name, strerror(errno));
+                {
+                    char err_buf[256] = {0,};
+                    char *errp;
+
+                    errp = (char *)strerror_r (errno, err_buf, sizeof(err_buf));
+                    XDBG_REPLY ("failed: open consol '%s'. (%s)\n", fd_name, errp);
+                }
             }
         }
 
@@ -790,7 +838,13 @@ xDbgModuleEvlogSetEvlogPath (XDbgModule *pMod, int pid, char *path, char *reply,
 
             xev_trace_fd = open (fd_name, O_RDWR);
             if (xev_trace_fd < 0)
-                XDBG_REPLY ("failed: open consol '%s'. (%s)\n", fd_name, strerror(errno));
+            {
+                char err_buf[256] = {0,};
+                char *errp;
+
+                errp = (char *)strerror_r (errno, err_buf, sizeof(err_buf));
+                XDBG_REPLY ("failed: open consol '%s'. (%s)\n", fd_name, errp);
+            }
 
             pMod->evlog_path = strdup (fd_name);
         }
@@ -819,7 +873,11 @@ xDbgModuleEvlogSetEvlogPath (XDbgModule *pMod, int pid, char *path, char *reply,
     xev_trace_record_fd = open (fd_name, O_CREAT|O_RDWR|O_APPEND, 0755);
     if (xev_trace_record_fd < 0)
     {
-        XDBG_REPLY ("failed: open file '%s'. (%s)\n", fd_name, strerror(errno));
+        char err_buf[256] = {0,};
+        char *errp;
+
+        errp = (char *)strerror_r (errno, err_buf, sizeof(err_buf));
+        XDBG_REPLY ("failed: open file '%s'. (%s)\n", fd_name, errp);
         return FALSE;
     }
 

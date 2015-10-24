@@ -34,6 +34,8 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "xdbg_module.h"
 
+void    xDbgModuleEvlogXErrorSetPath (char *path);
+
 Bool    xDbgModuleEvlogInstallHooks   (XDbgModule *pMod);
 void    xDbgModuleEvlogUninstallHooks (XDbgModule *pMod);
 

@@ -85,11 +85,11 @@ _printUsage(char* name)
     printf("\n");
     printf("              [RULE] : C Language-style boolean expression syntax. [VARIABLE] [COMPAROTOR] [VALUE]\n");
     printf("              [VARIABLE] : type / major / minor / command / cmd / pid\n");
-    printf("              [COMPARATOR] : & / && / and / | / || / or / = / == / != / > / >= / < / <=\n");
+    printf("              [COMPARATOR] : & / && / | / || / = / == / != / > / >= / < / <=\n");
     printf("              [VALUE] : string / number  \n");
     printf("\n");
     printf("           ie)\n");
-    printf("               xevlog_analyze -a \"(type=request) && (major == X11 and (minor = SendEvent or minor = ReceiveEvent))\"\n");
+    printf("               xevlog_analyze -a \"(type=request) && (major == X11 && (minor = SendEvent || minor = ReceiveEvent))\"\n");
     printf("               xevlog_analyze -n cmd!=ls\n");
     printf("\n");
     printf("           * WARNING : If you set both -a and -n option, must set -a option first. Otherwise Logs you DO NOT want can be printed.\n");
@@ -123,7 +123,11 @@ static void _xEvlogAnalyzePrint (EvlogOption *eo, char* reply, int* len)
     fd = open (eo->path_name, O_RDONLY);
     if (fd < 0)
     {
-        printf ("failed: open '%s'. (%s)\n", eo->path_name, strerror(errno));
+        char err_buf[256] = {0,};
+        char *errp;
+
+        errp = (char *)strerror_r (errno, err_buf, sizeof(err_buf));
+        printf ("failed: open '%s'. (%s)\n", eo->path_name, errp);
         return;
     }
 
@@ -132,7 +136,11 @@ static void _xEvlogAnalyzePrint (EvlogOption *eo, char* reply, int* len)
 
     if (cfd < 0)
     {
-        printf ("failed: open consol '%s'. (%s)\n", fd_name, strerror(errno));
+        char err_buf[256] = {0,};
+        char *errp;
+
+        errp = (char *)strerror_r (errno, err_buf, sizeof(err_buf));
+        printf ("failed: open consol '%s'. (%s)\n", fd_name, errp);
         goto print_done;
     }
 
@@ -516,7 +524,7 @@ int main(int argc, char** argv)
     if (!new_argv)
     {
         printf ("failed: malloc new argv\n");
-        exit (-1);
+        return 0;
     }
 
     snprintf (temp, sizeof(temp), "%d", (int)getpid());

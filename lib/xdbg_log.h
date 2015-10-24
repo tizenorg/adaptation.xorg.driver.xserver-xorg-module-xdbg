@@ -38,6 +38,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <errno.h>
 #include <stdlib.h>
+#include <xorg-server.h>
 #include <os.h>
 #include <xdbg_log_secure.h>
 
@@ -109,7 +110,11 @@ void* xDbgLog            (unsigned int module, int logoption, const char *file, 
 #if TIZEN_ENGINEER_MODE
 #define XDBG_SECURE(mod, fmt, ARG...)     XLOG_SECURE(mod, "[%s] "fmt, __FUNCTION__, ##ARG)
 #else
+#if USE_NORMAL_LOG
+#define XDBG_SECURE(mod, fmt, ARG...)     XLOG_INFO(mod, "[%s] "fmt, __FUNCTION__, ##ARG)
+#else
 #define XDBG_SECURE(mod, fmt, ARG...)     do { } while(0)
+#endif
 #endif
 
 #define XDBG_NEVER_GET_HERE(mod)          XLOG_ERROR(mod, "[%s:%d] ** NEVER GET HERE **\n", __FUNCTION__,__LINE__)

@@ -606,6 +606,7 @@ xDbgModuleCommandInitLogPath (XDbgModule *pMod, char *log_path)
     {
         char newname[XDBG_PATH_MAX];
         char filename[XDBG_PATH_MAX];
+        struct stat status;
         char *p = NULL, *last = NULL;
         int i;
 
@@ -621,9 +622,9 @@ xDbgModuleCommandInitLogPath (XDbgModule *pMod, char *log_path)
         snprintf (filename, XDBG_PATH_MAX, "%s", last + 1);
         snprintf (last, XDBG_PATH_MAX - (last - newname), "/prev.%s", filename);
 
-        if (rename (log_path, newname))
+        if (!stat (log_path, &status))
         {
-            if (errno != ENOENT)
+            if (rename (log_path, newname))
             {
                 XDBG_ERROR (MXDBG, "Failed: rename %s -> %s\n", log_path, newname);
                 return FALSE;

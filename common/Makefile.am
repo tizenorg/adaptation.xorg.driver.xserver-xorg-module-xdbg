@@ -29,6 +29,8 @@ COMMON_SOURCE =  \
     xdbg_evlog_core.c \
     xdbg_evlog_composite.c \
     xdbg_evlog_dri2.c \
+    xdbg_evlog_dri3.c \
+    xdbg_evlog_present.c \
     xdbg_evlog_damage.c \
     xdbg_evlog_gesture.c \
     xdbg_evlog_xext.c \

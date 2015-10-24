@@ -54,8 +54,8 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "dix.h"
 #endif
 
-static char *evt_type[] = { "Event", "Request", "Reply", "Flush", "Error" };
-static char *evt_dir[]  = { "<====", "---->",   "<----", "*****", "<----"};
+static char *evt_type[] = { "Event", "Request", "Reply", "Flush", "Error" ""};
+static char *evt_dir[]  = { "<====", "---->",   "<----", "*****", "<----", ""};
 
 static RULE_CHECKER rc = NULL;
 
@@ -285,6 +285,8 @@ xDbgEvlogRuleValidate (EvlogInfo *evinfo)
         evlog_name = evinfo->evt.name;
     else if (evinfo ->type == REPLY)
         evlog_name = evinfo->rep.name;
+    else if (evinfo ->type == XERROR)
+        return TRUE;
 
     return rulechecker_validate_rule (rc,
                                       evinfo->type,
@@ -305,7 +307,11 @@ xDbgEvlogReadRuleFile(const char *filename, char *reply, int *len)
     fd = open (filename, O_RDONLY);
     if (fd < 0)
     {
-        REPLY ("failed: open '%s'. (%s)\n", filename, strerror(errno));
+        char err_buf[256] = {0,};
+        char *errp;
+
+        errp = (char *)strerror_r (errno, err_buf, sizeof(err_buf));
+        REPLY ("failed: open '%s'. (%s)\n", filename, errp);
         return FALSE;
     }
 
@@ -368,6 +374,8 @@ ExtensionInfo Evlog_extensions[] = {
     {xDbgEvlogXextXtestExt1GetBase, 0, 0, 0, NULL, NULL},
     {xDbgEvlogXextShapeGetBase, 0, 0, 0, NULL, NULL},
     {xDbgEvlogXvGetBase, 0, 0, 0, NULL, NULL},
+    {xDbgEvlogDri3GetBase, 0, 0, 0, NULL, NULL},
+    {xDbgEvlogPresentGetBase, 0, 0, 0, NULL, NULL},
 #if HAVE_HWC
     {xDbgEvlogHwcGetBase, 0, 0, 0, NULL, NULL},
 #endif
@@ -487,13 +495,15 @@ xDbgEvlogFillLog (EvlogInfo *evinfo, int detail_level, char *reply, int *len)
         reply = xDbgEvlogReply (evinfo, detail_level, reply, len);
         REPLY (")");
     }
-    else if (evinfo->type == ERROR)
+    else if (evinfo->type == ERROR || evinfo->type == XERROR)
     {
-        REPLY("(ErrorCode(0x%02x) resourceID(0x%x) majorCode(%d) minorCode(%d))",
+        REPLY("(%s:ErrorCode(0x%02x) %s:majorCode(%d) minorCode(%d) resourceID(0x%x))",
+            evinfo->err.errorName,
             evinfo->err.errorCode,
-            (unsigned int)evinfo->err.resourceID,
+            evinfo->err.majorName,
             evinfo->err.majorCode,
-            evinfo->err.minorCode);
+            evinfo->err.minorCode,
+            (unsigned int)evinfo->err.resourceID);
     }
     else
     {

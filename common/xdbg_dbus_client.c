@@ -172,12 +172,20 @@ XDbgDBusClientInfo*
 xDbgDBusClientConnect (void)
 {
     XDbgDBusClientInfo *info = NULL;
+    char *display_num = NULL;
 
     info = calloc (1, sizeof (XDbgDBusClientInfo));
     GOTO_IF_FAIL (info != NULL, err_conn);
 
+
+    if(!(display_num = getenv("DISPLAY")))
+    {
+        XDBG_LOG ("[CLIENT] failed: get DISPLAY ENV\n");
+        goto err_conn;
+    }
+
     snprintf (info->client, STR_LEN, "%d", getpid());
-    snprintf (info->reqname, STR_LEN, "%s%d", XDBG_DBUS_CLIENT, getpid());
+    snprintf (info->reqname, STR_LEN, "%s%d", XDBG_DBUS_CLIENT, atoi(display_num));
 
     if (!_xDbgDBusClinetInit (info))
         goto err_conn;

@@ -44,11 +44,6 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define XDBG_PATH_MAX        1024
 #define XDBG_BUF_SIZE        64
 
-#ifdef PATH_MAX
-#undef PATH_MAX
-#endif //PATH_MAX
-#define PATH_MAX XDBG_PATH_MAX
-
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 #define SWAP(a, b)  ({int t; t = a; a = b; b = t;})
@@ -86,7 +81,8 @@ typedef enum
     REQUEST,
     REPLY,
     FLUSH,
-    ERROR
+    ERROR,
+    XERROR
 } EvlogType;
 
 #define EVLOG_MASK_CLIENT    (1<<0)
@@ -153,6 +149,8 @@ typedef struct _EvlogReply
 
 typedef struct _EvlogError
 {
+    char errorName[PATH_MAX+1];
+    char majorName[PATH_MAX+1];
     BYTE    errorCode;
     CARD32  resourceID;
     CARD16  minorCode;

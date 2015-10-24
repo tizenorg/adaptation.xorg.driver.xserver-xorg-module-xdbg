@@ -43,6 +43,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "xdbg_module.h"
 #include "xdbg_module_command.h"
 #include "xdbg_module_evlog.h"
+#include "xdbg_module_clist.h"
 
 #define __USE_GNU
 #include <sys/socket.h>
@@ -110,6 +111,7 @@ _traceClientState (CallbackListPtr *list, pointer closure, pointer calldata)
     NewClientInfoRec *clientinfo = (NewClientInfoRec*)calldata;
     ClientPtr client = clientinfo->client;
     ModuleClientInfo *info = GetClientInfo (client);
+    XDbgModule *pMod = (XDbgModule *)closure;
     static char* clientState[]=
     {
         "ClientStateInitial",
@@ -127,7 +129,18 @@ _traceClientState (CallbackListPtr *list, pointer closure, pointer calldata)
     if ((client->clientState == ClientStateInitial) || (client->clientState == ClientStateGone))
     {
         if (client->clientState == ClientStateInitial)
+        {
               _debugClientInfo (client);
+
+              if (pMod->trace_cnt)
+                  xDbgModuleClistTraceAdd (pMod, info);
+        }
+
+        if (client->clientState == ClientStateGone)
+        {
+              if (pMod->trace_cnt)
+                xDbgModuleClistTraceRemove (pMod, info);
+        }
 
         XDBG_SECURE (MXDBG, "id:%d, conn_fd:%d, pid:%d, uid:%d, name:%s (%s)\n",
               info->index, info->conn_fd, info->pid, info->uid, info->command,
@@ -150,6 +163,9 @@ xDbgModuleMain (XDbgModule *pMod)
         XDBG_ERROR (MXDBG, "failed: dixRegisterPrivateKey\n");
         return FALSE;
     }
+
+    if (pMod->trace_cnt)
+        xDbgModuleClistTraceInit (pMod);
 
     ret &= AddCallback (&ClientStateCallback, _traceClientState, pMod);
 
@@ -184,6 +200,8 @@ xDbgModuleMainExit (XDbgModule *pMod)
     xDbgModuleEvlogUninstallHooks (pMod);
 
     xDbgDBusServerRemoveMethod (&method);
+
+    free (pMod->trace_options);
 
     xDbgDBusServerDisconnect ();
 }

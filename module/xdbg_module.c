@@ -96,6 +96,8 @@ xDbgModuleSetup (pointer module, pointer opts, int *errmaj, int *errmin)
         /* Parse Options */
         xDbgModuleParseOptions (&module_xdbg, pOpt);
 
+        xorg_list_init (&module_xdbg.trace_list);
+
         /* Register block handler */
         RegisterBlockAndWakeupHandlers (_xDbgModuleBlockHandler,
                                        (WakeupHandlerProcPtr)NoopDDA,

@@ -96,6 +96,7 @@ _LogModule (void * handle, int logoption, const char * file, int line, const cha
     const char *name;
     struct timeval  tv;
     struct tm      *tm=NULL;
+    struct tm      result;
 
     if (!h)
         return;
@@ -113,7 +114,7 @@ _LogModule (void * handle, int logoption, const char * file, int line, const cha
         {
             /* get local time from tv */
             gettimeofday(&tv, NULL);
-            tm = localtime(&tv.tv_sec);
+            tm = localtime_r(&tv.tv_sec, &result);
 
             /* write to file */
             if (tm)
@@ -152,7 +153,7 @@ _LogModule (void * handle, int logoption, const char * file, int line, const cha
         if( tm == NULL )
         {
             gettimeofday(&tv, NULL);
-            tm = localtime(&tv.tv_sec);
+            tm = localtime_r(&tv.tv_sec, &result);
         }
 
         tv_ms = tv.tv_usec/1000;

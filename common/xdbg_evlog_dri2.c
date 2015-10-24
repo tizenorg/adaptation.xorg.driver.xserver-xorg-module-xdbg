@@ -195,8 +195,9 @@ _EvlogEventDri2 (EvlogInfo *evinfo, int first_base, int detail_level, char *repl
     case DRI2_BufferSwapComplete:
         {
             xDRI2BufferSwapComplete *stuff = (xDRI2BufferSwapComplete *) evt;
-            REPLY (": XID(0x%x) ust(0x%x/0x%x) msc(0x%x/0x%x) sbc(0x%x/0x%x)",
+            REPLY (": XID(0x%x) type:%d ust(0x%x/0x%x) msc(0x%x/0x%x) sbc(0x%x/0x%x)",
                 (unsigned int)stuff->drawable,
+                (int)stuff->event_type,
                 (unsigned int)stuff->ust_hi,
                 (unsigned int)stuff->ust_lo,
                 (unsigned int)stuff->msc_hi,

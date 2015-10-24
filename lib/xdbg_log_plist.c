@@ -103,6 +103,7 @@ const struct {
     {CREATE_PIXMAP_USAGE_FB,             "fb"},
     {CREATE_PIXMAP_USAGE_SUB_FB,         "sub_fb"},
     {CREATE_PIXMAP_USAGE_DRI2_BACK,      "dri2_back"},
+    {CREATE_PIXMAP_USAGE_DRI3_BACK,      "dri3"},
     /******END********/
     {0, "normal"}
 };
@@ -388,7 +389,7 @@ XDbgLogSetWindowPixmap (WindowPtr pWin, PixmapPtr pPixmap)
     pScreen->SetWindowPixmap (pWin, pPixmap);
     pScreen->SetWindowPixmap = XDbgLogSetWindowPixmap;
 
-    if (pPixmap != pScreen->GetWindowPixmap(pParent))
+    if (pParent && pPixmap != pScreen->GetWindowPixmap(pParent))
     {
         //Add to window list
         p = _findXDbgPixmap (pPixmap);
@@ -420,6 +421,8 @@ XDbgLogSetWindowPixmap (WindowPtr pWin, PixmapPtr pPixmap)
             XDBG_TRACE (MMEM, " Unset WinPixmap win(0x%x), pixmap(%p) hint:%s\n",
                                    (unsigned int)pWin->drawable.id, p->pPixmap, p->hint);
             xorg_list_del (&d->pRefPixmap->link);
+            XDbgPixmap * pix = _findXDbgPixmap (d->pRefPixmap->pPixmap);
+            if (pix) pix->refs--;
             free (d->pRefPixmap);
             d->pRefPixmap = NULL;
         }
@@ -438,6 +441,8 @@ XDbgLogSetWindowPixmap (WindowPtr pWin, PixmapPtr pPixmap)
         d->pRefPixmap = p_ref;
 
         p->refs++;
+        if (p->numHistory >= MAX_HISTORY)
+            memmove(p->refHistorys, &(p->refHistorys[1]), --(p->numHistory));
         p->refHistorys[p->numHistory++] = pWin->drawable.id;
 
         XDBG_TRACE (MMEM, " Set WinPixmap win(0x%x), pixmap(%p) hint:%s\n",

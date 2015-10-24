@@ -39,6 +39,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <dbus/dbus.h>
 #include <os.h>
 #include <dix.h>
+#include <fcntl.h>
 
 #include "xdbg.h"
 #include "xdbg_types.h"
@@ -69,6 +70,127 @@ static XDbgDBusServerInfo server_info;
 static CARD32 _xDbgDBusServerTimeout (OsTimerPtr timer, CARD32 time, pointer arg);
 static Bool _xDbgDBusServerInit (XDbgDBusServerInfo *info);
 static void _xDbgDBusServerDeinit (XDbgDBusServerInfo *info);
+
+static uint32_t
+_xdbgDBusServerGetClientPID(DBusConnection *conn, char *client_name)
+{
+    DBusMessage *msg = NULL;
+    DBusMessage *reply_msg = NULL;
+    DBusMessageIter iter;
+    DBusError err;
+    uint32_t pid = 0;
+
+    RETURN_VAL_IF_FAIL (client_name != NULL, 0);
+
+    dbus_error_init (&err);
+
+    msg = dbus_message_new_method_call ("org.freedesktop.DBus", "/org/freedesktop/DBus",
+                                        "org.freedesktop.DBus", "GetConnectionUnixProcessID");
+
+    GOTO_IF_FAIL (msg != NULL, err_send);
+
+    dbus_message_iter_init_append (msg, &iter);
+
+    if (!dbus_message_iter_append_basic (&iter, DBUS_TYPE_STRING, &client_name))
+    {
+        XDBG_ERROR (MDBUS, "[SERVER] failed: append\n");
+        goto err_send;
+    }
+
+    reply_msg = dbus_connection_send_with_reply_and_block (conn, msg,
+                                                           1000, &err);
+
+    if (dbus_error_is_set (&err))
+    {
+        XDBG_ERROR (MDBUS, "[SERVER] failed: send (%s)\n",  err.message);
+        goto err_send;
+    }
+    GOTO_IF_FAIL (reply_msg != NULL, err_send);
+
+    if (!dbus_message_iter_init (reply_msg, &iter))
+    {
+        XDBG_ERROR (MDBUS, "[SERVER] Message has no arguments\n");
+        goto err_send;
+    }
+
+    if (dbus_message_iter_get_arg_type (&iter) != DBUS_TYPE_UINT32)
+    {
+        XDBG_ERROR (MDBUS, "[SERVER] Argument is not unint32!\n");
+        goto err_send;
+    }
+
+    dbus_message_iter_get_basic (&iter, &pid);
+    if (!pid)
+    {
+        XDBG_ERROR (MDBUS, "[SERVER] pid is 0\n");
+        goto err_send;
+    }
+
+    XDBG_DEBUG (MDBUS, "[SERVER] Get Client name:%s pid:%u\n", client_name, pid);
+
+    return pid;
+
+err_send:
+    if (msg)
+        dbus_message_unref(msg);
+    if (reply_msg)
+        dbus_message_unref(reply_msg);
+
+    return 0;
+}
+
+
+static Bool
+_xDbgDBusServerCheckSmackLabel (DBusConnection *connection)
+{
+    char xdbg_client_name[STR_LEN];
+    char label_path[STR_LEN];
+    char label[STR_LEN];
+    uint32_t pid = 0;
+    int fd = -1;
+    int i;
+
+    snprintf(xdbg_client_name, sizeof(xdbg_client_name), "org.x.dbg.client%d", atoi(display));
+
+    pid = _xdbgDBusServerGetClientPID (connection, xdbg_client_name);
+    if (!pid)
+    {
+        XDBG_ERROR (MDBUS, "[SERVER] failed: Get client PID\n");
+    	return FALSE;
+    }
+
+    snprintf(label_path, sizeof(label_path), "/proc/%u/attr/current", pid);
+
+    fd = open(label_path, O_RDONLY);
+    if (fd < 0)
+    {
+
+        XDBG_ERROR (MDBUS, "[SERVER] Failed: Open client smack label path\n");
+    	return FALSE;
+    }
+
+    i = read(fd, label, sizeof(label));
+    close(fd);
+
+    if (i < 0)
+    {
+        XDBG_ERROR (MDBUS, "[SERVER] Failed: Read client smack label\n");
+    	return FALSE;
+    }
+
+    if (i < STR_LEN)
+        label[i] = '\0';
+
+    if (strcmp(label, "xorg"))
+    {
+        XDBG_ERROR (MDBUS, "[SERVER] Deny  smack label:%s\n", label);
+        return FALSE;
+    }
+
+    XDBG_DEBUG (MDBUS, "[SERVER] Get client  smack label:%s\n", label);
+
+    return TRUE;
+}
 
 static Bool
 _xDbgDBusServerReplyMessage (XDbgDBusServerInfo *info, DBusMessage *msg, char *reply)
@@ -227,6 +349,9 @@ _xDbgDBusServerMsgHandler (DBusConnection *connection, DBusMessage *msg, void *d
 
     XDBG_DEBUG (MDBUS, "[SERVER] Got a message (%s.%s)\n",
                dbus_message_get_interface (msg), dbus_message_get_member (msg));
+
+    if (!_xDbgDBusServerCheckSmackLabel(connection))
+        return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 
     if (!dbus_message_is_method_call (msg, XDBG_DBUS_INTERFACE, XDBG_DBUS_METHOD))
         return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;

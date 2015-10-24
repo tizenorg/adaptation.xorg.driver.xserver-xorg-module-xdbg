@@ -35,5 +35,8 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "xdbg_module.h"
 
 void xDbgModuleCList (XDbgModule *pMod, char *reply, int *len);
+void xDbgModuleClistTraceInit (XDbgModule *pMod);
+void xDbgModuleClistTraceAdd (XDbgModule *pMod, ModuleClientInfo *info);
+void xDbgModuleClistTraceRemove (XDbgModule *pMod, ModuleClientInfo *info);
 
 #endif /* __XDBG_MODULE_CLIST_H__ */
